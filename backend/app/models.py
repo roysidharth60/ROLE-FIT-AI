@@ -20,3 +20,18 @@ class Requirement(BaseModel):
         if self.is_ambiguous and not (self.ambiguity_note and self.ambiguity_note.strip()):
             raise ValueError("ambiguity_note is required when is_ambiguous is true")
         return self
+
+
+    
+
+class CatalogProject(BaseModel):
+    """A hand-written illustrative reference project from the catalogue."""
+
+    id: int
+    title: str
+    domain: str
+    description: str
+    skills: list[str]
+    difficulty: Literal["beginner", "intermediate", "advanced"]
+    evidence_signals: list[str]
+    score: int = 0  # relevance score, only filled in when searching

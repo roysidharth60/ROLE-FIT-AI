@@ -1,9 +1,20 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models import Requirement
+from app.catalog import list_projects, search_projects
+from app.db import init_db
+from app.models import CatalogProject, Requirement
 
-app = FastAPI(title="RoleFit AI API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()  # make sure the tables exist whenever the server starts
+    yield
+
+
+app = FastAPI(title="RoleFit AI API", version="0.1.0", lifespan=lifespan)
 
 # Allow the React dev server (Vite) to call this backend during development.
 app.add_middleware(
@@ -18,6 +29,17 @@ app.add_middleware(
 def health():
     """Tiny check that the server is alive."""
     return {"status": "ok", "app": "RoleFit AI", "version": "0.1.0"}
+
+
+@app.get("/api/projects", response_model=list[CatalogProject])
+def get_projects(
+    q: str | None = Query(default=None, max_length=5000, description="Text to match, e.g. a job description"),
+    limit: int = Query(default=3, ge=1, le=10),
+):
+    """List the catalogue, or rank it against the text in q."""
+    if q is None or not q.strip():
+        return list_projects()
+    return search_projects(q, limit)
 
 
 @app.post("/api/dev/check-requirement")
