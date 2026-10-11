@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from botocore.exceptions import ClientError
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.catalog import list_projects, search_projects
 from app.db import init_db
-from app.models import CatalogProject, Requirement
+from app.extractor import ExtractionError, extract_requirements
+from app.models import CatalogProject, ExtractRequest, ExtractResponse, Requirement
 
 
 @asynccontextmanager
@@ -40,6 +42,19 @@ def get_projects(
     if q is None or not q.strip():
         return list_projects()
     return search_projects(q, limit)
+
+
+@app.post("/api/dev/extract-requirements", response_model=ExtractResponse)
+def dev_extract_requirements(body: ExtractRequest):
+    """Temporary dev endpoint: job description in, verified requirements out."""
+    try:
+        reqs, warnings, usage = extract_requirements(body.jd_text)
+    except ExtractionError as err:
+        raise HTTPException(status_code=502, detail=str(err))
+    except ClientError as err:
+        code = err.response.get("Error", {}).get("Code", "Unknown")
+        raise HTTPException(status_code=502, detail=f"The AI model call failed ({code}).")
+    return ExtractResponse(requirements=reqs, warnings=warnings, usage=usage)
 
 
 @app.post("/api/dev/check-requirement")

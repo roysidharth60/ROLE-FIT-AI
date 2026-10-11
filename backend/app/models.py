@@ -35,3 +35,22 @@ class CatalogProject(BaseModel):
     difficulty: Literal["beginner", "intermediate", "advanced"]
     evidence_signals: list[str]
     score: int = 0  # relevance score, only filled in when searching
+
+
+
+
+
+class RequirementList(BaseModel):
+    """What we ask the AI to return."""
+
+    requirements: list[Requirement]
+
+
+class ExtractRequest(BaseModel):
+    jd_text: str = Field(min_length=50, max_length=20000, description="The job description text")
+
+
+class ExtractResponse(BaseModel):
+    requirements: list[Requirement]
+    warnings: list[str]
+    usage: dict | None = None  # token counts, handy while developing

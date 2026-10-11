@@ -7,3 +7,5 @@ pydantic
 typing
 pydantic
 pathlib
+langchain-aws
+langchain-core
