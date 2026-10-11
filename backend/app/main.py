@@ -7,7 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.catalog import list_projects, search_projects
 from app.db import init_db
 from app.extractor import ExtractionError, extract_requirements
-from app.models import CatalogProject, ExtractRequest, ExtractResponse, Requirement
+from app.models import (
+    CatalogProject,
+    ExtractRequest,
+    ExtractResponse,
+    GenerateResponse,
+    Requirement,
+)
+from app.project_generator import GenerationError, generate_projects
 
 
 @asynccontextmanager
@@ -55,6 +62,28 @@ def dev_extract_requirements(body: ExtractRequest):
         code = err.response.get("Error", {}).get("Code", "Unknown")
         raise HTTPException(status_code=502, detail=f"The AI model call failed ({code}).")
     return ExtractResponse(requirements=reqs, warnings=warnings, usage=usage)
+
+
+@app.post("/api/dev/generate-projects", response_model=GenerateResponse)
+def dev_generate_projects(body: ExtractRequest):
+    """Temporary dev endpoint: job description in, requirements + 3 reference projects out."""
+    try:
+        reqs, req_warnings, _ = extract_requirements(body.jd_text)
+        projects, issues, attempts, usage, plan = generate_projects(body.jd_text, reqs)
+    except (ExtractionError, GenerationError) as err:
+        raise HTTPException(status_code=502, detail=str(err))
+    except ClientError as err:
+        code = err.response.get("Error", {}).get("Code", "Unknown")
+        raise HTTPException(status_code=502, detail=f"The AI model call failed ({code}).")
+    return GenerateResponse(
+        requirements=reqs,
+        extraction_warnings=req_warnings,
+        projects=projects,
+        issues=issues,
+        attempts=attempts,
+        usage=usage,
+        coverage_plan=plan,
+    )
 
 
 @app.post("/api/dev/check-requirement")

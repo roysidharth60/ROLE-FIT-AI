@@ -1,11 +1,7 @@
 boto3
 python-dotenv
-Navigator
 fastapi
 uvicorn[standard]
 pydantic
-typing
-pydantic
-pathlib
 langchain-aws
 langchain-core

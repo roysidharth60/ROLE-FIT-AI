@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, computed_field
 
 
 class Requirement(BaseModel):
@@ -54,3 +54,142 @@ class ExtractResponse(BaseModel):
     requirements: list[Requirement]
     warnings: list[str]
     usage: dict | None = None  # token counts, handy while developing
+
+
+
+
+class Issue(BaseModel):
+    """A problem found by our deterministic checks."""
+
+    severity: Literal["error", "warning"]
+    message: str
+
+
+class Metric(BaseModel):
+    """One measured result. Python, not the AI, calculates the percentage."""
+
+    name: str = Field(min_length=3, max_length=80, description="What is measured")
+    unit: str = Field(min_length=1, max_length=20)
+    baseline: float = Field(gt=0, description="Value before the change")
+    result: float = Field(ge=0, description="Value after the change")
+    direction: Literal["decrease", "increase"]
+
+    @computed_field
+    @property
+    def change_pct(self) -> float:
+        if self.direction == "decrease":
+            change = (self.baseline - self.result) / self.baseline * 100
+        else:
+            change = (self.result - self.baseline) / self.baseline * 100
+        return round(change, 1)
+
+
+class ReferenceProject(BaseModel):
+    """An illustrative reference project. Never presented as a real person's work."""
+
+    id: str = Field(pattern=r"^P\d+$")
+    kind: Literal["work", "academic"]
+    title: str = Field(min_length=5, max_length=100)
+    scenario: str = Field(min_length=20, max_length=400)
+    stack: list[str] = Field(min_length=2, max_length=8)
+    constraints: list[str] = Field(min_length=1, max_length=4)
+    architecture: str = Field(min_length=10, max_length=400)
+    cv_bullets: list[str] = Field(min_length=2, max_length=3)
+    metrics: list[Metric] = Field(default_factory=list, max_length=3)
+    readiness_statement: str | None = Field(default=None, max_length=250)
+    evidence_signals: list[str] = Field(min_length=5, max_length=8)
+    covers_requirement_ids: list[str] = Field(min_length=1)
+
+    @computed_field
+    @property
+    def label(self) -> str:
+        # Always added by code, never by the AI
+        if self.kind == "work":
+            return "Illustrative reference project - all figures are examples"
+        return "Illustrative academic reference project - example only"
+
+
+    
+
+class ProjectSet(BaseModel):
+    """What we ask the AI to return: exactly three projects."""
+
+    projects: list[ReferenceProject] = Field(min_length=3, max_length=3)
+
+
+class GenerateResponse(BaseModel):
+    requirements: list[Requirement]
+    extraction_warnings: list[str]
+    projects: list[ReferenceProject]
+    issues: list[Issue]  # remaining errors or warnings for employer review
+    attempts: int
+    usage: dict | None = None
+    coverage_plan: dict[str, list[str]] = Field(default_factory=dict)
+
+
+
+
+class MetricPlan(BaseModel):
+    """The model proposes a rough metric. Python decides the exact numbers."""
+
+    name: str = Field(min_length=3, max_length=80, description="What is measured")
+    unit: str = Field(min_length=1, max_length=20, description="A duration, count, rate per 1,000 or money. Never %")
+    direction: Literal["decrease", "increase"]
+    baseline_hint: float = Field(gt=0, description="A rough starting value before the change")
+    improvement_pct: float = Field(ge=15, le=90, description="Rough improvement, between 15 and 90")
+
+
+class WorkBulletPlan(BaseModel):
+    text: str = Field(
+        min_length=20,
+        max_length=250,
+        description="Use the exact placeholders {baseline}, {result} and {pct} where the numbers go",
+    )
+    metric: MetricPlan
+
+
+class WorkDraft(BaseModel):
+    """Strict shape for one work project, used only while generating."""
+
+    title: str = Field(min_length=5, max_length=100)
+    scenario: str = Field(min_length=20, max_length=400)
+    stack: list[str] = Field(min_length=2, max_length=8)
+    constraints: list[str] = Field(
+        min_length=1,
+        max_length=4,
+        description="Real-world limits of the situation (data size, deadline, compliance). Not writing instructions.",
+    )
+    architecture: str = Field(min_length=10, max_length=400)
+    bullets: list[WorkBulletPlan] = Field(min_length=3, max_length=3)
+    evidence_signals: list[str] = Field(min_length=5, max_length=8)
+    covers_requirement_ids: list[str] = Field(min_length=1)
+
+
+class AcademicDraft(BaseModel):
+    """Strict shape for the academic project, used only while generating."""
+
+    title: str = Field(min_length=5, max_length=100)
+    scenario: str = Field(min_length=20, max_length=400)
+    stack: list[str] = Field(min_length=2, max_length=8)
+    constraints: list[str] = Field(
+        min_length=1,
+        max_length=4,
+        description="Real-world limits of the situation (data source, scope). Not writing instructions.",
+    )
+    architecture: str = Field(min_length=10, max_length=400)
+    bullets: list[str] = Field(min_length=2, max_length=3)
+    readiness_statement: str = Field(min_length=20, max_length=250)
+    evidence_signals: list[str] = Field(min_length=5, max_length=8)
+    covers_requirement_ids: list[str] = Field(min_length=1)
+
+
+class Premise(BaseModel):
+    title: str = Field(min_length=5, max_length=100)
+    situation: str = Field(min_length=20, max_length=300)
+
+
+class PremisePlan(BaseModel):
+    """Three different starting situations, planned before the projects are written."""
+
+    employer_name: str = Field(default="", max_length=100)
+    premises: list[Premise] = Field(min_length=3, max_length=3)

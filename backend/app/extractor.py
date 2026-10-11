@@ -1,3 +1,5 @@
+import re
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.llm import get_llm
@@ -7,15 +9,22 @@ SYSTEM_PROMPT = (
     "You extract requirements from a job description. Rules:\n"
     "1) Never invent requirements. Use only what the text says.\n"
     "2) Number IDs R1, R2, R3 in order.\n"
-    "3) importance is 'mandatory' ONLY when the text explicitly says required, must, "
-    "essential, needed or a minimum. Use 'preferred' for nice-to-have, plus, bonus or "
-    "preferred items.\n"
-    "4) If a line only describes the job or the culture and says neither, set importance to "
-    "'preferred' and is_ambiguous to true.\n"
-    "5) source_quote must be copied word-for-word from the job description.\n"
-    "6) If a requirement is vague or cannot be checked on a CV, set is_ambiguous to true and "
-    "write a SPECIFIC ambiguity_note saying what is unclear and what the employer could "
-    "clarify (for example, a number, a tool or a level)."
+    "3) importance comes from the section an item sits under: 'mandatory' for Required, Must have, "
+    "Essential or Minimum; 'preferred' for Nice to have, Good to have, Plus or Preferred. Lines under "
+    "neither label that only describe the job or the culture are 'preferred' with is_ambiguous true.\n"
+    "4) Split lists into one requirement per item (for example, items separated by semicolons).\n"
+    "5) source_quote: copy ONE contiguous piece of the job description word-for-word, WITHOUT any section "
+    "label such as 'Must have:' or 'Good to have:'.\n"
+    "6) Do not extract working conditions (location, hybrid or remote work, office days, salary, benefits, "
+    "hours) or descriptions of the company as requirements.\n"
+    "7) If a requirement is vague or cannot be checked on a CV, set is_ambiguous to true and write a SPECIFIC "
+    "ambiguity_note saying what is unclear and what the employer could clarify (for example, a number, a tool "
+    "or a level)."
+)
+
+CONDITION_PHRASES = (
+    "hybrid", "remote work", "work from home", "in the office", "on-site", "onsite",
+    "salary", "benefits", "relocation", "days in office",
 )
 
 
@@ -30,6 +39,19 @@ def _norm(text: str) -> str:
     return " ".join(text.lower().split())
 
 
+def _quote_found(quote: str, jd_norm: str) -> bool:
+    """Contiguous quote, or quote once its 'Label:' prefix is removed, or pieces split by '...'."""
+    q = _norm(quote)
+    if q in jd_norm:
+        return True
+    if ":" in q:
+        tail = q.split(":", 1)[1].strip()
+        if tail and tail in jd_norm:
+            return True
+    parts = [p.strip() for p in re.split(r"\.\.\.|\u2026", q) if p.strip()]
+    return len(parts) > 1 and all(p in jd_norm for p in parts)
+
+
 def check_requirements(jd_text: str, reqs: list[Requirement]) -> tuple[list[Requirement], list[str]]:
     """Deterministic checks. Returns (clean requirements, warnings for the employer)."""
     warnings: list[str] = []
@@ -37,9 +59,14 @@ def check_requirements(jd_text: str, reqs: list[Requirement]) -> tuple[list[Requ
 
     kept: list[Requirement] = []
     for r in reqs:
-        if _norm(r.source_quote) not in jd_norm:
+        if not _quote_found(r.source_quote, jd_norm):
             warnings.append(
                 f"Removed '{r.text}': its source quote was not found in the job description."
+            )
+            continue
+        if any(phrase in _norm(f"{r.text} {r.source_quote}") for phrase in CONDITION_PHRASES):
+            warnings.append(
+                f"Removed '{r.text}': it is a working condition, not a skill the candidate must show."
             )
             continue
         kept.append(r)
