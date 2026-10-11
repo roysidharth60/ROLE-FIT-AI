@@ -193,3 +193,46 @@ class PremisePlan(BaseModel):
 
     employer_name: str = Field(default="", max_length=100)
     premises: list[Premise] = Field(min_length=3, max_length=3)
+
+class SkillGroup(BaseModel):
+    label: str = Field(min_length=3, max_length=40, description="For example: Data and SQL")
+    items: list[str] = Field(min_length=2, max_length=8)
+
+
+class IdealProfileDraft(BaseModel):
+    """What we ask the AI to write: only the parts that need wording."""
+
+    target_title: str = Field(min_length=3, max_length=80, description="The job title this CV is aimed at")
+    summary: str = Field(
+        min_length=40,
+        max_length=450,
+        description="2 sentences, third-person free, about the skills and kind of work. No invented employers.",
+    )
+    skill_groups: list[SkillGroup] = Field(min_length=2, max_length=4)
+
+
+class ChecklistItem(BaseModel):
+    """One ATS-friendliness check, calculated by Python."""
+
+    id: str
+    label: str
+    passed: bool
+    detail: str
+
+
+class ReferenceCV(BaseModel):
+    """The one-page reference CV. Placeholders are fixed by code, never written by the AI."""
+
+    candidate_name: str = "[Candidate Name]"
+    contact_line: str = "[City] | [email] | [phone] | [LinkedIn]"
+    target_title: str
+    summary: str
+    skill_groups: list[SkillGroup] = Field(min_length=2, max_length=4)
+    projects: list[ReferenceProject] = Field(min_length=3, max_length=3)
+    education_note: str = "[Add your own education and certifications here]"
+    checklist: list[ChecklistItem] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def label(self) -> str:
+        return "Illustrative reference CV - example content only, not a real person"
