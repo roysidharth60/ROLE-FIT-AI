@@ -236,3 +236,38 @@ class ReferenceCV(BaseModel):
     @property
     def label(self) -> str:
         return "Illustrative reference CV - example content only, not a real person"
+
+
+class JobDraft(BaseModel):
+    """Everything the employer reviews on Page 1. Nothing here is saved until they publish."""
+
+    requirements: list[Requirement]
+    extraction_warnings: list[str]
+    projects: list[ReferenceProject]
+    ideal_profile: IdealProfileDraft
+    cv: ReferenceCV
+    issues: list[Issue]
+    coverage_plan: dict[str, list[str]] = Field(default_factory=dict)
+    usage: dict | None = None
+
+
+
+class JobSaveRequest(BaseModel):
+    """What Page 1 sends when the employer saves or publishes the reviewed draft."""
+
+    title: str = Field(min_length=3, max_length=120)
+    draft: JobDraft
+    publish: bool = False
+    confirm_publish: bool = False  # the explicit "yes, publish" from the employer
+
+
+class JobSummary(BaseModel):
+    id: int
+    title: str
+    status: Literal["draft", "published"]
+    created_at: str
+    published_at: str | None = None
+
+
+class JobRecord(JobSummary):
+    draft: JobDraft

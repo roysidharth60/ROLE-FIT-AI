@@ -326,4 +326,11 @@ def generate_projects(jd_text: str, requirements: list[Requirement]):
             seen.add(issue.message)
             unique.append(issue)
 
-    return projects, unique, total_attempts, {"input_tokens": tokens_in, "output_tokens": tokens_out}, plan
+        return (
+        projects,
+        unique,
+        total_attempts,
+        {"input_tokens": tokens_in, "output_tokens": tokens_out},
+        plan,
+        premise_plan.employer_name,
+    )
