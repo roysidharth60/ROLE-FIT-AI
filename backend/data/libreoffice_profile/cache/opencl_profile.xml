@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profile>
+ <version>LibreOffice v1</version>
+ <device>
+  <type>opencl</type>
+  <name>Intel(R) Iris(R) Xe Graphics</name>
+  <driver>32.0.101.6127</driver>
+  <time>max</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>opencl</type>
+  <name>Intel(R) Iris(R) Xe Graphics</name>
+  <driver>1.1.0</driver>
+  <time>max</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>opencl</type>
+  <name>Microsoft Basic Render Driver</name>
+  <driver>1.1.0</driver>
+  <time>max</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>native</type>
+  <time>3110400</time>
+  <errors>false</errors>
+ </device>
+</profile>

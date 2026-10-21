@@ -18,6 +18,8 @@ def _cv_text(cv: ReferenceCV) -> str:
     for p in cv.projects:
         parts.append(p.title)
         parts.extend(p.stack)
+        parts.append(p.scenario)  # printed as "Problem tackled" / "Question explored"
+        parts.append(p.architecture)  # printed as "How it was built"
         parts.extend(p.cv_bullets)
         parts.append(p.readiness_statement or "")
     return " ".join(parts)

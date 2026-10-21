@@ -24,6 +24,22 @@ from typing import Literal
 
 from app.jobs_repo import get_job, list_jobs, save_job
 from app.models import JobRecord, JobSaveRequest, JobSummary
+from app.cv_builder import build_reference_cv
+from app.docx_export import export_with_checks
+from app.models import (
+    BuildCvRequest,
+    JobPlan,
+    PlanRequest,
+    ProfileRequest,
+    ProfileResult,
+    ProjectRequest,
+    ProjectResult,
+    BulletsRequest,
+    BulletsResult
+)
+from app.profile_generator import generate_ideal_profile, merge_profile, rewrite_bullets
+from app.project_generator import generate_single_project, plan_job
+from app.applicant.router import router as applicant_router
 
 
 @asynccontextmanager
@@ -33,6 +49,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="RoleFit AI API", version="0.1.0", lifespan=lifespan)
+
+app.include_router(applicant_router)
 
 # Allow the React dev server (Vite) to call this backend during development.
 app.add_middleware(
@@ -144,3 +162,68 @@ def get_one_job(job_id: int):
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")
     return job
+
+
+def _ai_errors(func, *args, **kwargs):
+    """Run an AI step and turn its failures into a clear 502 for the browser."""
+    try:
+        return func(*args, **kwargs)
+    except (ExtractionError, GenerationError) as err:
+        raise HTTPException(status_code=502, detail=str(err))
+    except ClientError as err:
+        code = err.response.get("Error", {}).get("Code", "Unknown")
+        raise HTTPException(status_code=502, detail=f"The AI model call failed ({code}).")
+
+
+@app.post("/api/jobs/requirements", response_model=ExtractResponse)
+def job_requirements(body: ExtractRequest):
+    reqs, warnings, usage = _ai_errors(extract_requirements, body.jd_text)
+    return ExtractResponse(requirements=reqs, warnings=warnings, usage=usage)
+
+
+@app.post("/api/jobs/plan", response_model=JobPlan)
+def job_plan(body: PlanRequest):
+    premise_plan, coverage, usage = _ai_errors(plan_job, body.jd_text, body.requirements)
+    return JobPlan(
+        employer_name=premise_plan.employer_name,
+        premises=premise_plan.premises,
+        coverage_plan=coverage,
+        usage=usage,
+    )
+
+
+@app.post("/api/jobs/project", response_model=ProjectResult)
+def job_project(body: ProjectRequest):
+    project, issues, attempts, usage = _ai_errors(
+        generate_single_project,
+        body.jd_text, body.requirements, body.project_id, body.premise,
+        body.employer_name, body.targets, body.others, body.employer_note,
+    )
+    return ProjectResult(project=project, issues=issues, attempts=attempts, usage=usage)
+
+
+@app.post("/api/jobs/profile", response_model=ProfileResult)
+def job_profile(body: ProfileRequest):
+    new, issues, usage = _ai_errors(
+        generate_ideal_profile,
+        body.jd_text, body.requirements, body.project_stacks, body.employer_name, body.employer_note,
+        body.summary_sentences, body.part, body.current,
+    )
+    return ProfileResult(profile=merge_profile(body.current, new, body.part), issues=issues, usage=usage)
+
+
+@app.post("/api/jobs/build-cv", response_model=ReferenceCV)
+def job_build_cv(body: BuildCvRequest):
+    """No AI call: assemble the CV from the current parts and re-run every check on the real file."""
+    cv = build_reference_cv(body.profile, body.projects, body.requirements)
+    _, cv = export_with_checks(cv)
+    return cv
+
+
+@app.post("/api/jobs/bullets", response_model=BulletsResult)
+def job_bullets(body: BulletsRequest):
+    bullets, issues, usage = _ai_errors(
+        rewrite_bullets, body.kind, body.title, body.scenario, body.stack, body.current_bullets,
+        body.employer_note, body.employer_name, body.bullet_count, body.max_words,
+    )
+    return BulletsResult(bullets=bullets, issues=issues, usage=usage)

@@ -6,12 +6,17 @@ from app.models import JobDraft, JobRecord, JobSummary
 
 
 def _summary(row) -> JobSummary:
+    try:
+        employer = json.loads(row["profile_json"]).get("employer_name", "") or ""
+    except (ValueError, TypeError):
+        employer = ""  # older rows saved before this field existed
     return JobSummary(
         id=row["id"],
         title=row["title"],
         status=row["status"],
         created_at=row["created_at"],
         published_at=row["published_at"],
+        employer_name=employer,
     )
 
 

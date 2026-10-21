@@ -1,0 +1,10 @@
+Add these TWO lines to backend/app/main.py (your existing file). Nothing else changes.
+
+1) With the other imports at the top:
+from app.applicant.router import router as applicant_router
+
+2) Right after  app = FastAPI(...)  and the CORS middleware block:
+app.include_router(applicant_router)
+
+Install the two packages (inside your backend venv):
+pip install python-docx python-multipart

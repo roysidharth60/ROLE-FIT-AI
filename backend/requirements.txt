@@ -6,3 +6,4 @@ pydantic
 langchain-aws
 langchain-core
 python-docx
+python-multipart

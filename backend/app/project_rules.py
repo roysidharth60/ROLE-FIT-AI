@@ -103,6 +103,10 @@ _META_WORDS = {
 }
 
 
+MAX_PROBLEM_CHARS = 260  # the "Problem tackled" line on the one-page CV
+MAX_HOW_BUILT_CHARS = 170  # the "How it was built" line on the one-page CV
+
+
 def check_project(p: ReferenceProject) -> list[Issue]:
     issues: list[Issue] = []
     for rid in p.covers_requirement_ids:
@@ -112,6 +116,18 @@ def check_project(p: ReferenceProject) -> list[Issue]:
         words = len(bullet.split())
         if words > MAX_BULLET_WORDS:
             issues.append(_err(f"{p.id} bullet {n} has {words} words (maximum {MAX_BULLET_WORDS})."))
+
+    # Warnings only: the employer can shorten the text in the preview before downloading.
+    if len(p.scenario) > MAX_PROBLEM_CHARS:
+        issues.append(_warn(
+            f"{p.id}: the problem line has {len(p.scenario)} characters (aim for {MAX_PROBLEM_CHARS} or fewer "
+            "so the CV stays on one page)."
+        ))
+    if len(p.architecture) > MAX_HOW_BUILT_CHARS:
+        issues.append(_warn(
+            f"{p.id}: the 'how it was built' line has {len(p.architecture)} characters (aim for "
+            f"{MAX_HOW_BUILT_CHARS} or fewer so the CV stays on one page)."
+        ))
 
     leaked = sorted(set(re.findall(r"[a-z\-]+", " ".join(p.constraints).lower())) & _META_WORDS)
     if leaked:

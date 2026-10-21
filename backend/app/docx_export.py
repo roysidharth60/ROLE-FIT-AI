@@ -15,21 +15,21 @@ REQUIRED_HEADINGS = ["Professional Summary", "Skills", "Project Experience"]
 
 def _style_document(doc: Document) -> None:
     section = doc.sections[0]
-    section.left_margin = section.right_margin = Inches(0.8)
-    section.top_margin = section.bottom_margin = Inches(0.7)
+    section.left_margin = section.right_margin = Inches(0.7)
+    section.top_margin = section.bottom_margin = Inches(0.5)
 
     normal = doc.styles["Normal"]
     normal.font.name = FONT
-    normal.font.size = Pt(10.5)
+    normal.font.size = Pt(10)
     normal.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
     normal.paragraph_format.space_after = Pt(2)
 
     heading = doc.styles["Heading 1"]
     heading.font.name = FONT
-    heading.font.size = Pt(11.5)
+    heading.font.size = Pt(11)
     heading.font.bold = True
     heading.font.color.rgb = RGBColor(0, 0, 0)
-    heading.paragraph_format.space_before = Pt(8)
+    heading.paragraph_format.space_before = Pt(5)
     heading.paragraph_format.space_after = Pt(3)
     # Word's default heading uses theme fonts that would override Calibri; remove those links
     for attr in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
@@ -50,6 +50,15 @@ def _heading(doc: Document, text: str) -> None:
     p_pr.append(borders)
 
 
+def _labelled(doc: Document, label: str, text: str) -> None:
+    """One short paragraph: a bold label, then the text. Used for the two lines above the bullets."""
+    para = doc.add_paragraph()
+    para.add_run(label + ": ").bold = True
+    para.add_run(text)
+    para.paragraph_format.space_after = Pt(1)
+    para.paragraph_format.keep_with_next = True
+
+
 def _project(doc: Document, project: ReferenceProject) -> None:
     title = doc.add_paragraph()
     title.add_run(project.title).bold = True
@@ -63,6 +72,10 @@ def _project(doc: Document, project: ReferenceProject) -> None:
     run.italic = True
     run.font.size = Pt(9)
     label.paragraph_format.keep_with_next = True
+
+    first_label = "Problem tackled" if project.kind == "work" else "Question explored"
+    _labelled(doc, first_label, project.scenario)
+    _labelled(doc, "How it was built", project.architecture)
 
     for bullet in project.cv_bullets:
         doc.add_paragraph(bullet, style="List Bullet")
@@ -159,12 +172,18 @@ def verify_docx(data: bytes, cv: ReferenceCV) -> list[ChecklistItem]:
     ))
 
     missing = [b[:30] for b in bullets_expected if b not in full_text]
-    if cv.summary not in full_text:
-        missing.append("summary")
+    
+    for proj in cv.projects:
+        if proj.scenario not in full_text:
+            missing.append(f"{proj.id} problem line")
+        if proj.architecture not in full_text:
+            missing.append(f"{proj.id} how-it-was-built line")
+
     items.append(ChecklistItem(
         id="text_extractable", label="All text can be read back from the file",
         passed=not missing,
-        detail="Every bullet and the summary were extracted." if not missing else f"Not found: {missing}",
+        detail="The summary, the two lines above each project, and every bullet were extracted." 
+           if not missing else f"Not found: {missing}",
     ))
 
     years = re.findall(r"\b(?:19|20)\d{2}\b", full_text)
