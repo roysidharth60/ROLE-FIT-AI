@@ -45,3 +45,4 @@ backend/data/libreoffice_profile/client_secret_*.json
 backend/gmail_auth.py
 backend/data/applicant_sessions/
 backend/data/libreoffice_profile/
+client_secret_*.json
