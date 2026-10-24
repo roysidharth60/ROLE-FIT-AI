@@ -82,7 +82,7 @@ export default function ApplicantCvBuilderPage() {
     setDownloading(format);
     try {
       const blob = await renderCv(result.session_id, mapping, format, true);
-      saveBlob(blob, format === "pdf" ? "CV.pdf" : "CV.docx");
+      saveBlob(blob, `${result.download_base || "CV"}.${format}`);
     } catch (err) {
       setActionError(err.message);
     } finally {

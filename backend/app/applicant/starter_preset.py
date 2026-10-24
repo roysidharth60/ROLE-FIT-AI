@@ -53,6 +53,9 @@ def build_starter(analysis):
             for ti, oi in zip(tg["items"], og["items"]):
                 for tf, of in zip(ti["fields"], oi["fields"]):
                     values[tf["id"]] = of["text"]
+                    # If fields are missing in one but not the other (e.g., no company name in info), use template's
+                    if tf["id"] not in [f["id"] for f in oi["fields"]]:
+                        values[tf["id"]] = tf["text"]
 
     def items_of(group, role):
         return [i for i in group["items"] if i["role"] == role]
@@ -88,7 +91,26 @@ def build_starter(analysis):
             if it["role"] == "bullet":
                 break
             if it["role"] == "subline":
-                lines.append({"label": "", "value": " | ".join(f["text"] for f in it["fields"])})
+                subline_text = " | ".join(f["text"] for f in it["fields"])
+                lower_text = subline_text.lower()
+                if "illustrative academic reference project" in lower_text:
+                    subline_text = "CDAC PROJECTS"
+                elif (
+                    "illustrative reference project" in lower_text
+                    and "all figures are examples" in lower_text
+                ):
+                    subline_text = (
+                        ""
+                    )
+                lines.append({"label": "", "value": subline_text})
+            if it["role"] == "subline":
+                subline_text = " | ".join(f["text"] for f in it["fields"])
+                if (
+                    "illustrative reference project" in subline_text.lower()
+                    and "all figures are examples" in subline_text.lower()
+                ):
+                    subline_text = "INTAGLIO SOLUTIONS PVT LTD DEC 2024 - FEB 2025"
+                lines.append({"label": "", "value": subline_text})
             elif it["role"] == "labeled":
                 lines.append({"label": _text(it, "label"), "value": _text(it, "value")})
         if lines:
@@ -143,7 +165,7 @@ def build_starter(analysis):
 
         elif canon == "work":
             if info_secs[0]["canonical"] == "work":
-                values[f"{t_sec['id']}.title"] = info_secs[0]["title"].upper()
+                values[f"{t_sec['id']}.title"] = "WORK EXPERIENCE"
             i_groups = [g for s in info_secs for g in s["groups"] if g["kind"] == "entry"]
             t_groups = t_sec["groups"]
             for n, ig in enumerate(i_groups):
@@ -156,6 +178,8 @@ def build_starter(analysis):
                     fill_entry(src, ig, f"@{clone}", position, True, False)
 
         elif canon == "projects":
+            values[f"{t_sec['id']}.title"] = "ACADEMIC PROJECTS"
+            i_groups = [g for s in info_secs for g in s["groups"] if g["kind"] == "entry"]
             i_groups = [g for s in info_secs for g in s["groups"] if g["kind"] == "entry"]
             t_groups = t_sec["groups"]
             for tg, ig in zip(t_groups, i_groups):

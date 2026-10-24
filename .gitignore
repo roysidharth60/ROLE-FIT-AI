@@ -34,3 +34,14 @@ Thumbs.db
 *.log
 
 backend/data/*.docx
+gmail_oauth_client.json
+gmail_token.json
+
+# Local applicant session data
+backend/data/applicant_sessions/
+
+# Local LibreOffice profile
+backend/data/libreoffice_profile/client_secret_*.json
+backend/gmail_auth.py
+backend/data/applicant_sessions/
+backend/data/libreoffice_profile/

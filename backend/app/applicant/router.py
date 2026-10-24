@@ -14,6 +14,7 @@ from .leftovers import find_leftovers
 from .pdf import PdfError, docx_to_pdf_bytes
 from .render import render_docx
 from .starter_preset import build_starter
+from docx import Document
 
 router = APIRouter(prefix="/api/applicant", tags=["applicant"])
 
@@ -45,6 +46,26 @@ async def _save(upload: UploadFile, nice_name: str, target: Path):
         raise HTTPException(400, f"The {nice_name} file is not a valid .docx file.")
     target.write_bytes(data)
 
+def _safe(text):
+    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_")
+
+
+def _download_base(template_path, info_filename):
+    """File name for the downloads: FirstName_LastName-CompanyFromTheInfoFileName"""
+    person = ""
+    try:
+        for p in Document(str(template_path)).paragraphs:
+            if p.text.strip():
+                words = re.findall(r"[A-Za-z]+", p.text)
+                person = "_".join(w.capitalize() for w in words[:3])
+                break
+    except Exception:
+        pass
+    stem = Path(info_filename or "").stem
+    stem = re.sub(r"[_\-\s]*(reference[_\-\s]*cv|reference|resume|cv)\b", "", stem, flags=re.I)
+    company = _safe(stem)
+    parts = [x for x in (person, company) if x]
+    return "-".join(parts) if parts else "CV"
 
 @router.post("/analyze")
 async def analyze_files(info: UploadFile = File(...), template: UploadFile = File(...)):
@@ -64,6 +85,7 @@ async def analyze_files(info: UploadFile = File(...), template: UploadFile = Fil
         raise HTTPException(400, "One of the files could not be read. Please check that both are valid Word documents.")
     result["session_id"] = session_id
     result["filenames"] = {"info": info.filename, "template": template.filename}
+    result["download_base"] = _download_base(template_path, info.filename)
     return result
 
 
