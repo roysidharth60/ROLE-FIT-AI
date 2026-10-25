@@ -51,7 +51,8 @@ jobs:
               "sudo systemctl reload nginx",
               "sudo systemctl restart rolefit-ai",
               "sudo systemctl is-active --quiet rolefit-ai",
-              "curl --fail --silent http://127.0.0.1/api/health"
+              "sudo systemctl is-active --quiet rolefit-ai",
+              "curl -i --show-error http://127.0.0.1/api/health",
             ]' \
             --query 'Command.CommandId' \
             --output text)
