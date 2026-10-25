@@ -96,8 +96,8 @@ def build_starter(analysis):
                 if "illustrative academic reference project" in lower_text:
                     subline_text = "CDAC PROJECTS"
                 elif (
-                    "illustrative reference project" in lower_text
-                    and "all figures are examples" in lower_text
+                    "CDAC PROJECTS" 
+                    
                 ):
                     subline_text = (
                         ""
