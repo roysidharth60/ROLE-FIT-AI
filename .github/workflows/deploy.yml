@@ -40,8 +40,8 @@ jobs:
             --parameters 'commands=[
               "set -e",
               "cd /home/ssm-user/rolefit-ai",
-              "git fetch origin",
-              "git reset --hard origin/main",
+              "git -c safe.directory=/home/ssm-user/rolefit-ai fetch origin",
+              "git -c safe.directory=/home/ssm-user/rolefit-ai reset --hard origin/main",
               "/home/ssm-user/rolefit-ai/.venv/bin/pip install -r /home/ssm-user/rolefit-ai/backend/requirements.txt",
               "cd /home/ssm-user/rolefit-ai/frontend",
               "npm ci",
