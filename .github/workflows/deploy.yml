@@ -1,0 +1,89 @@
+
+name: Deploy ROLE FIT-AI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: rolefit-ai-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Deploy application through SSM
+        env:
+          INSTANCE_ID: i-0995558ce4e3ecc67
+        run: |
+          set -euo pipefail
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ROLE FIT-AI from GitHub Actions" \
+            --parameters 'commands=[
+              "set -e",
+              "cd /home/ssm-user/rolefit-ai",
+              "git fetch origin",
+              "git reset --hard origin/main",
+              "/home/ssm-user/rolefit-ai/.venv/bin/pip install -r /home/ssm-user/rolefit-ai/backend/requirements.txt",
+              "cd /home/ssm-user/rolefit-ai/frontend",
+              "npm ci",
+              "npm run build",
+              "sudo rsync -a --delete /home/ssm-user/rolefit-ai/frontend/dist/ /var/www/rolefit-ai/",
+              "sudo nginx -t",
+              "sudo systemctl reload nginx",
+              "sudo systemctl restart rolefit-ai",
+              "sudo systemctl is-active --quiet rolefit-ai",
+              "curl --fail --silent http://127.0.0.1/api/health"
+            ]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM command ID: $COMMAND_ID"
+
+          for attempt in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' \
+              --output text 2>/dev/null || true)
+
+            echo "Deployment status: ${STATUS:-Pending}"
+
+            case "$STATUS" in
+              Success)
+                echo "Deployment completed successfully."
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query '{Status:Status,Error:Error,Output:StandardOutputContent,Details:StandardErrorContent}' \
+                  --output json || true
+                exit 1
+                ;;
+            esac
+
+            sleep 10
+          done
+
+          echo "Timed out waiting for deployment."
+          exit 1
