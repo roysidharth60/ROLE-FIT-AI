@@ -1,5 +1,5 @@
 // Talks to the FastAPI backend. Change API_URL if your backend runs elsewhere.
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = "";
 
 export async function analyzeFiles(infoFile, templateFile) {
   const form = new FormData();
