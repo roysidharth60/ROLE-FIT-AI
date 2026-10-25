@@ -102,9 +102,7 @@ def build_starter(analysis):
                     subline_text = (
                         ""
                     )
-                lines.append({"label": "", "value": subline_text})
-            if it["role"] == "subline":
-                subline_text = " | ".join(f["text"] for f in it["fields"])
+                
                 if (
                     "illustrative reference project" in subline_text.lower()
                     and "all figures are examples" in subline_text.lower()
