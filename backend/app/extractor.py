@@ -90,14 +90,32 @@ def check_requirements(jd_text: str, reqs: list[Requirement]) -> tuple[list[Requ
 
 
 def extract_requirements(jd_text: str) -> tuple[list[Requirement], list[str], dict | None]:
-    """Ask the model for requirements, then verify them in code."""
-    structured = get_llm().with_structured_output(RequirementList, include_raw=True)
-    result = structured.invoke(
-        [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=jd_text)]
-    )
+    """Ask the model for requirements, retry once on malformed structured output, then verify in code."""
+    # Job descriptions with many requirements can produce a partial final item. Give extraction
+    # a larger output budget and one retry rather than failing the entire draft immediately.
+    structured = get_llm(max_tokens=4000).with_structured_output(RequirementList, include_raw=True)
+    result = None
 
-    if result["parsed"] is None:
-        raise ExtractionError(f"The model's answer did not match the schema: {result['parsing_error']}")
+    for attempt in range(2):
+        system_prompt = SYSTEM_PROMPT
+        if attempt == 1:
+            system_prompt += (
+                "\nIMPORTANT: Your previous response was incomplete or invalid. Retry from the beginning. "
+                "Every item in requirements MUST include all four fields: id, text, importance, and source_quote. "
+                "Never emit a partial item. If a requirement cannot be extracted confidently, omit it instead."
+            )
+        result = structured.invoke(
+            [SystemMessage(content=system_prompt), HumanMessage(content=jd_text)]
+        )
+        if result["parsed"] is not None:
+            break
+
+    if result is None or result["parsed"] is None:
+        detail = result.get("parsing_error") if result else "No response was returned"
+        raise ExtractionError(
+            "The AI model returned incomplete requirement data after a retry. "
+            f"Please try again. Validation detail: {detail}"
+        )
 
     clean, warnings = check_requirements(jd_text, result["parsed"].requirements)
     usage = dict(result["raw"].usage_metadata) if result["raw"].usage_metadata else None
