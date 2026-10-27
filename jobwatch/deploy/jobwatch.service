@@ -1,0 +1,15 @@
+[Unit]
+Description=JobWatch careers-page monitor
+After=network.target
+
+[Service]
+User=ssm-user
+WorkingDirectory=/opt/jobwatch
+EnvironmentFile=/opt/jobwatch/.env
+# MUST stay a single worker: the poller runs as a background thread inside the app.
+ExecStart=/opt/jobwatch/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8080 --workers 1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

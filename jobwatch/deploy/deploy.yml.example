@@ -1,0 +1,19 @@
+# Adapt to your existing RoleFit workflow (same secrets, same SSH style). Needs secrets: EC2_HOST, EC2_USER, EC2_SSH_KEY
+name: deploy-jobwatch
+on:
+  push:
+    branches: [main]
+    paths: ["jobwatch/**"]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH setup
+        run: |
+          mkdir -p ~/.ssh && echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+      - name: Sync code (data/, .env and venv/ are never touched)
+        run: rsync -az --delete --exclude 'data/' --exclude '.env' --exclude 'venv/' --exclude '__pycache__/' jobwatch/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/jobwatch/
+      - name: Install deps and restart
+        run: ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "cd /opt/jobwatch && venv/bin/pip install -r requirements.txt && sudo systemctl restart jobwatch"

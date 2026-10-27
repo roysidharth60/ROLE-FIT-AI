@@ -1,0 +1,30 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>JobWatch</title>
+<style>body{font:14px system-ui;max-width:1000px;margin:20px auto;padding:0 12px}section{border:1px solid #bbb;border-radius:8px;padding:12px;margin:12px 0}
+input,textarea{width:100%;box-sizing:border-box;margin:3px 0 8px;padding:6px}button{padding:5px 12px;margin-right:6px}
+.st{padding:1px 8px;border-radius:9px;color:#fff;font-size:12px}.ok{background:#2a7}.pending{background:#888}.empty,.needs_js_or_empty{background:#c80}.error,.blocked{background:#c33}
+#flagged{border-color:#c33;background:#fff2f2}li{margin:2px 0}small{color:#666}</style>
+<h2>JobWatch</h2>
+<section><b>Preferences</b> <small>(comma separated)</small>
+<input id=include placeholder="Include words: java, spring boot, .net, c#, fresher"><input id=exclude placeholder="Exclude words: senior, lead, manager">
+<input id=locations placeholder="Locations: pune, mumbai, remote, india"><input id=interval type=number min=1 placeholder="Check every N minutes">
+<input id=tg_token placeholder="Telegram bot token (leave as is to keep)"><input id=tg_chat placeholder="Telegram chat id">
+<button onclick=savePrefs()>Save preferences</button><button onclick=runNow()>Run now</button><span id=msg></span></section>
+<section><b>Add career pages</b> <small>(one link per line, up to 50)</small><textarea id=urls rows=5></textarea>
+<button onclick=addUrls()>Add &amp; auto-detect</button><div id=addres></div></section>
+<section id=flagged><b>Red flag box</b> <small>(removed from companies.csv)</small><ul id=fl></ul></section>
+<section><b>Companies &amp; responses</b> <small>Check the sample jobs; if wrong, press Wrong.</small><div id=co></div></section>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=(p,b)=>fetch(p,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{}).then(r=>r.json());
+async function load(){const s=await api('/api/state');for(const k in s.prefs)if($(k))$(k).value=s.prefs[k];
+$('fl').innerHTML=s.flagged.map(f=>`<li><b>${esc(f.name)}</b> - ${esc(f.reason||'no reason')} <small>${esc(f.careers_url)}</small></li>`).join('')||'<small>Nothing flagged</small>';
+$('co').innerHTML=s.companies.map(c=>`<div style="border-top:1px solid #ddd;padding:6px 0"><b>${esc(c.name)}</b> <span class="st ${esc(c.status)}">${esc(c.status)}</span>
+<small>${esc(c.type||'generic')} | ${c.count??0} jobs | new: ${(c.new||[]).length} | ${esc(c.checked||'')}</small> <button onclick="wrong('${esc(c.name).replace(/'/g,'')}')">Wrong</button>
+<br><small><a href="${esc(c.careers_url)}" target=_blank rel=noopener>${esc(c.careers_url)}</a> ${esc(c.error||'')}</small>
+<ul>${(c.sample||[]).map(j=>`<li><a href="${esc(j.url)}" target=_blank rel=noopener>${esc(j.title)}</a></li>`).join('')}</ul></div>`).join('')}
+async function savePrefs(){await api('/api/prefs',{include:$('include').value,exclude:$('exclude').value,locations:$('locations').value,interval:+$('interval').value||10,tg_token:$('tg_token').value,tg_chat:$('tg_chat').value});$('msg').textContent=' saved'}
+async function runNow(){await api('/api/run',{});$('msg').textContent=' running... reload in a minute'}
+async function addUrls(){const r=await api('/api/companies/bulk',{urls:$('urls').value.split('\n')});
+$('addres').innerHTML=`Added ${r.added.length}: ${r.added.map(a=>esc(a.name)+' ('+esc(a.type||'generic')+')').join(', ')}<br>`+r.rejected.map(x=>`<span style=color:#c33>${esc(x.url)} - ${esc(x.why)}</span>`).join('<br>');$('urls').value='';load()}
+async function wrong(n){const reason=prompt('What was wrong? (optional)')??null;if(reason===null)return;await api('/api/flag',{name:n,reason});load()}
+load()</script>
